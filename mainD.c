@@ -144,9 +144,6 @@ void transizioneNonDet(char* nastro, int det) {
 void trovaPassi(char* nastro, int det) {
     int trovato = 0;
 
-    Lorenzo Magni, [01.09.18 23:04]
-
-
     for(int i = 0; i < sizeof(statoIn); i++) {
         if(statoIn[i] == statoOutTmp) {
             if(letto[i] == nastro[puntatoreNastro]) {
