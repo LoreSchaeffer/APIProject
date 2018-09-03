@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
 #include <string.h>
 
 #define INT_SIZE 4
@@ -12,28 +11,29 @@ char* letto;
 char* scritto;
 char* movimento;
 int* statoOut;
+int trSize = 0;
 
 //Parametri macchina
 int* acc;
+int accSize = 0;
 long max;
 
-//Variabili di nastroGlobale
-char* nastroGlobale;
-size_t lunghezza;
-int passi;
+//Variabili globali
+struct Nastro nastro;
 int statoOutTmp = 0;
-int puntatoreNastro = 0;
-int* trPossibili;
-int numeroPossibili = 0;
-struct Passo* passaggi;
 
 //Structs
-typedef struct Passo {
-    int passi;
+typedef struct Nastro {
+    size_t len;
     char* nastro;
-    int puntatoreNastro;
-    int numPossibili;
-    int trCorrente;
+    int puntatore;
+};
+
+typedef struct Passo {
+    size_t len;
+    char* nastro;
+    int puntatore;
+    int tr;
     int statoOutTmp;
 };
 
@@ -67,7 +67,14 @@ char* ottieniFrammento(char* nastro, int puntatore) {
     return NULL;
 }
 
-char* sbianchina(char* nastro, int min, int max) {
+int isAccettazione(int tr) {
+    for(int i = 0; i < accSize; i++) {
+        if(tr == acc[i]) return 1;
+    }
+    return 0;
+}
+
+/*char* sbianchina(char* nastro, int min, int max) {
     for(int i = min; i < max; i++) {
         nastro[i] = '_';
     }
@@ -78,9 +85,8 @@ void aggiornaNastro(char* nastro) {
     free(nastroGlobale);
     nastroGlobale = malloc(sizeof(nastro));
     strcpy(nastroGlobale, nastro);
-}
-
-void transizioneDet(char* nastro, int puntatoreNastro, int det) {
+}*/
+/*void transizioneDet(char* nastro, int puntatoreNastro, int det) {
     int tr = trPossibili[0];
     int len = (int) strlen(nastro);
     nastro[puntatoreNastro] = scritto[tr];
@@ -135,13 +141,8 @@ void transizioneDet(char* nastro, int puntatoreNastro, int det) {
             }
         }
     }
-}
-
-void transizioneNonDet(char* nastro, int det) {
-
-}
-
-void trovaPassi(char* nastro, int det) {
+}*/
+/*void trovaPassi(char* nastro, int det) {
     int trovato = 0;
 
     for(int i = 0; i < sizeof(statoIn); i++) {
@@ -151,7 +152,7 @@ void trovaPassi(char* nastro, int det) {
                 passi++;
                 trPossibili[numeroPossibili] = i;
                 numeroPossibili++;
-                /*struct Passo passo = {
+                struct Passo passo = {
                         passi,
                         nastroGlobale,
                         puntatoreNastro,
@@ -160,7 +161,7 @@ void trovaPassi(char* nastro, int det) {
                         statoOutTmp
                 };
                 passaggi = (struct Passo*) realloc(passaggi, sizeof(passaggi) + sizeof(passaggi));
-                passaggi*/
+                passaggi
             }
         }
     }
@@ -176,10 +177,50 @@ void trovaPassi(char* nastro, int det) {
     }
 
     //TODO Move this to struct
-    /*if(passi > max) {
+    if(passi > max) {
         printf("U\n");
         return;
-    }*/
+    }
+}*/
+
+int* trovaPassi(struct Nastro subnastro) {
+    int* passi = malloc(1024); //TODO Verificare grandezza in base ai test
+    int i = 0;
+    for(int tr = 0; tr < trSize; tr++) {
+        if(statoIn[tr] == statoOutTmp && letto[tr] == subnastro.nastro[subnastro.puntatore]) {
+            passi[i + 1] = tr;
+            i++;
+            passi[0] = i;
+        }
+    }
+
+    return passi;
+}
+
+
+
+void gestore() {
+    char* tmp = ottieniFrammento(nastro.nastro, 0);
+    struct Nastro subnastro = {strlen(tmp), tmp, 0};
+    free(tmp);
+
+    long p = 0;
+    while(1) {
+        if(p >= max) {
+            printf("U\n");
+            return;
+        }
+        int* passi = trovaPassi(subnastro);
+        for(int i = 1; i <= passi[0]; i++) {
+            int tr = passi[i];
+            if(isAccettazione(tr) == 1) {
+                printf("%i\n", 1);
+                return;
+            }
+            struct Passo passo = {subnastro.len, subnastro.nastro, subnastro.puntatore, tr, statoOutTmp};
+        }
+        p++;
+    }
 }
 
 int main() {
@@ -204,6 +245,7 @@ int main() {
         int i = 0;
 
         while (scanf("%d %c %c %c %d", &p1, &p2, &p3, &p4, &p5)) {
+            trSize++;
             statoIn[i] = p1;
             letto[i] = p2;
             scritto[i] = p3;
@@ -229,6 +271,7 @@ int main() {
         while (scanf("%d", &p1)) {
             acc[i] = p1;
             i++;
+            trSize++;
             acc = (int *) realloc(acc, (i + 2) * INT_SIZE);
         }
     }
@@ -236,7 +279,6 @@ int main() {
     scanf("%ms", &input);
     if(strcmp(input, "max\n")) {
         free(input);
-
         scanf("%ld", &max);
     }
 
@@ -244,13 +286,16 @@ int main() {
     if(strcmp(input, "run\n")) {
         free(input);
 
-        while (scanf("%ms", &nastroGlobale)) {
-            lunghezza = strlen(nastroGlobale);
-            passi = 0;
-            free(trPossibili);
-            trPossibili = (int*) malloc(INT_SIZE);
-            trovaPassi(nastroGlobale, 1);
-            free(nastroGlobale);
+        char * tmp;
+        while (scanf("%ms", &tmp)) {
+            size_t len = strlen(tmp);
+            tmp = (char*) realloc(tmp, len + 1);
+            tmp[len] = '\0';
+            struct Nastro n = {len, tmp, 0};
+            nastro = n;
+            statoOutTmp = 0;
+            //printf("%s,\t%ld,\t%i\n",nastro.nastro, len, nastro.puntatore);
+            gestore();
         }
     }
     return 0;
