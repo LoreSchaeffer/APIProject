@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INT_SIZE 4
-#define SIZE 128
+#define INT_DIMENSIONE 4
+#define DIMENSIONE 128
 
 //Transizioni
 int* statoIn;
@@ -42,11 +42,11 @@ char* frammenta(char* nastro, int sezione) {
     if(sezione == 0) {
         inizio = 0;
     } else {
-        inizio = SIZE * sezione + 1;
+        inizio = DIMENSIONE * sezione + 1;
     }
-    int fine = inizio + SIZE;
+    int fine = inizio + DIMENSIONE;
 
-    char* output = malloc(SIZE);
+    char* output = malloc(DIMENSIONE);
 
     int j = 0;
     for(int i = inizio; i < fine; i++) {
@@ -59,7 +59,7 @@ char* frammenta(char* nastro, int sezione) {
 char* ottieniFrammento(char* nastro, int puntatore) {
     int j = 0;
     for(int i = 1; i < strlen(nastro); i++) {
-        if(puntatore < i * SIZE) {
+        if(puntatore < i * DIMENSIONE) {
             return frammenta(nastro, j);
         }
         j++;
@@ -94,19 +94,19 @@ void aggiornaNastro(char* nastro) {
     if(movimento[tr] == 'R') {
         if(puntatoreNastro == len - 1) { //TODO Check if this character is '\0'
             if(det == 1) {
-                nastro = (char*) realloc(nastro, lunghezza + SIZE);
-                lunghezza += SIZE;
+                nastro = (char*) realloc(nastro, lunghezza + DIMENSIONE);
+                lunghezza += DIMENSIONE;
                 nastro = sbianchina(nastro, puntatoreNastro, lunghezza);
                 puntatoreNastro++;
                 aggiornaNastro(nastro);
             } else {
                 if(puntatoreNastro == lunghezza - 1) {
-                    nastro = (char*) realloc(nastro, lunghezza + SIZE);
-                    lunghezza += SIZE;
+                    nastro = (char*) realloc(nastro, lunghezza + DIMENSIONE);
+                    lunghezza += DIMENSIONE;
                     nastro = sbianchina(nastro, puntatoreNastro, lunghezza);
                     puntatoreNastro++;
                 } else {
-                    nastro = (char*) realloc(nastro, (size_t) (len + SIZE));
+                    nastro = (char*) realloc(nastro, (DIMENSIONE_t) (len + DIMENSIONE));
                     puntatoreNastro++;
                     strcat(nastro, ottieniFrammento(nastroGlobale, puntatoreNastro));
                 }
@@ -118,10 +118,10 @@ void aggiornaNastro(char* nastro) {
     else if(movimento[tr] == 'L') {
         if(puntatoreNastro == 0) {
             if(det == 1) {
-                nastro = (char*) realloc(nastro, lunghezza + SIZE);
-                lunghezza += SIZE;
+                nastro = (char*) realloc(nastro, lunghezza + DIMENSIONE);
+                lunghezza += DIMENSIONE;
                 memmove(nastro, nastro, lunghezza - 1);
-                sbianchina(nastro, puntatoreNastro, SIZE);
+                sbianchina(nastro, puntatoreNastro, DIMENSIONE);
                 aggiornaNastro(nastro);
             } else {
 
@@ -133,7 +133,7 @@ void aggiornaNastro(char* nastro) {
         if(det == 1) {
             nastro = (char*) realloc(nastro, (lunghezza + 1));
             lunghezza++;
-            memmove(nastro, nastro, (size_t) (lunghezza - 1));
+            memmove(nastro, nastro, (DIMENSIONE_t) (lunghezza - 1));
             aggiornaNastro(nastro);
         } else {
             if(puntatoreNastro == 0) {
@@ -224,12 +224,12 @@ void gestore() {
 }
 
 int main() {
-    statoIn = malloc(INT_SIZE);
+    statoIn = malloc(INT_DIMENSIONE);
     letto = malloc(1);
     scritto = malloc(1);
     movimento = malloc(1);
-    statoOut = malloc(INT_SIZE);
-    acc = malloc(INT_SIZE);
+    statoOut = malloc(INT_DIMENSIONE);
+    acc = malloc(INT_DIMENSIONE);
 
     char* input;
 
@@ -253,11 +253,11 @@ int main() {
             statoOut[i] = p5;
             i++;
 
-            statoIn = (int *) realloc(statoIn, (i + 2) * INT_SIZE);
+            statoIn = (int *) realloc(statoIn, (i + 2) * INT_DIMENSIONE);
             letto = (char *) realloc(letto, (i + 2));
             scritto = (char *) realloc(scritto, (i + 2));
             movimento = (char *) realloc(movimento, (i + 2));
-            statoOut = (int *) realloc(statoOut, (i + 2) * INT_SIZE);
+            statoOut = (int *) realloc(statoOut, (i + 2) * INT_DIMENSIONE);
         }
     }
 
@@ -272,7 +272,7 @@ int main() {
             acc[i] = p1;
             i++;
             trSize++;
-            acc = (int *) realloc(acc, (i + 2) * INT_SIZE);
+            acc = (int *) realloc(acc, (i + 2) * INT_DIMENSIONE);
         }
     }
 
