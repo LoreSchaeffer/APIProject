@@ -73,9 +73,9 @@ char* patch(char* nastro, char* patch, size_t puntatore, size_t len) {
     return nastro;
 }
 
-int isAccettazione(int tr) {
+int isAccettazione(int statoOut) {
     for(int i = 0; i < accSize; i++) {
-        if(tr == acc[i]) return 1;
+        if(statoOut == acc[i]) return 1;
     }
     return 0;
 }
@@ -87,7 +87,7 @@ int isInMezzo(int puntatore) {
 }
 
 char* sbianchina(char* nastro, size_t min) {
-    for(size_t i = min; i < min + SIZE - 1; i++) {
+    for(size_t i = min; i <= min + SIZE - 1; i++) {
         //printf("Sbianchina: %s\n", nastro);
         nastro[i] = '_';
     }
@@ -118,7 +118,6 @@ void gestore() {
     while(1) {
         printf("Nastro: %s\n", subnastro.nastro);
         printf("Passo: %ld, Puntatore: %i, Carattere: %c, Len: %ld\n", p, subnastro.puntatore, subnastro.nastro[subnastro.puntatore], subnastro.len);
-        printf("________________________________________________________________________________________________________________________________\n");
         if(p >= max) {
             printf("U\n");
             return;
@@ -126,8 +125,9 @@ void gestore() {
         int* passi = trovaPassi(subnastro);
         if(passi[0] == 1) {
             int tr = passi[1];
+            printf("Transizione {Riga: %i, Scritto: %c Movimento: %c, StatoOut: %i}\n", tr + 2, scritto[tr], movimento[tr], statoOut[tr]);
 
-            if(isAccettazione(tr)) {
+            if(isAccettazione(statoOut[tr])) {
                 printf("%i\n", 1);
                 return;
             }
@@ -161,10 +161,9 @@ void gestore() {
             else if(movimento[tr] == 'L') {
                 if(subnastro.puntatore == 0) {
                     char* nastroTmp = malloc(subnastro.len + SIZE);
-                    memcpy(nastroTmp + SIZE - 1, subnastro.nastro, subnastro.len);
-                    printf("NastroTmp: %s\n", nastroTmp);
+                    memcpy(nastroTmp + SIZE, subnastro.nastro, subnastro.len);
                     nastroTmp = sbianchina(nastroTmp, 0);
-                    struct Nastro subnastroTmp = {subnastro.len + SIZE, nastroTmp, subnastro.puntatore + SIZE};
+                    struct Nastro subnastroTmp = {subnastro.len + SIZE, nastroTmp, subnastro.puntatore + SIZE - 1};
                     subnastro = subnastroTmp;
                     puntatoreGlobale += SIZE;
                     /*subnastro.nastro = (char *) realloc(subnastro.nastro, subnastro.len + SIZE);
@@ -187,6 +186,7 @@ void gestore() {
             struct Passo passo = {subnastro.len, subnastro.nastro, subnastro.puntatore, tr, statoOutTmp};
         }*/
         p++;
+        printf("________________________________________________________________________________________________________________________________\n");
     }
 }
 
@@ -219,6 +219,7 @@ int main() {
             movimento[i] = p4;
             statoOut[i] = p5;
             i++;
+            trSize++;
 
             statoIn = (int *) realloc(statoIn, (i + 2) * INT_SIZE);
             letto = (char *) realloc(letto, (i + 2));
@@ -238,7 +239,7 @@ int main() {
         while (scanf("%d", &p1)) {
             acc[i] = p1;
             i++;
-            trSize++;
+            accSize++;
             acc = (int *) realloc(acc, (i + 2) * INT_SIZE);
         }
     }
@@ -262,8 +263,10 @@ int main() {
             nastro = n;
             statoOutTmp = 0;
             //printf("%s,\t%ld,\t%i\n",nastro.nastro, len, nastro.puntatore);
+            printf("\n"); //TODO Remove this
             gestore();
-            return 0;
+            printf("\n\n\n");
+            //return 0;
         }
     }
     return 0;
