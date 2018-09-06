@@ -16,7 +16,7 @@ int trSize = 0;
 //Parametri macchina
 int* acc;
 int accSize = 0;
-long max;
+long unsigned max;
 
 //Verifica stampa
 int passiTemporanei= 0;
