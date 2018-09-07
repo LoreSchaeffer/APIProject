@@ -16,32 +16,27 @@ int trSize = 0;
 //Parametri macchina
 int* acc;
 int accSize = 0;
-long unsigned max;
-
-//Verifica stampa
-int passiTemporanei= 0;
-int sconosciuto = 0;
-int nonAccettato = 0;
-
-//Variabili globali
-struct Nastro nastro;
-int statoOutTmp = 0;
-size_t puntatoreGlobale = 0;
+long max;
 
 //Structs
 typedef struct Nastro {
     size_t len;
     char* nastro;
     int puntatore;
-};
+} Nastro;
 
-typedef struct Passo {
+/*typedef struct Passo {
     size_t len;
     char* nastro;
     int puntatore;
     int tr;
     int statoOutTmp;
-};
+};*/
+
+//Variabili globali
+Nastro nastro;
+int statoOutTmp = 0;
+size_t puntatoreGlobale = 0;
 
 char* substring(size_t inizio) { //TODO Si potrebbe rimuovere inizio nalla lunghezza in allocazione mem
     char* tmp = malloc(nastro.len);
@@ -100,16 +95,17 @@ char* sbianchina(char* nastro, size_t min) {
     return nastro;
 }
 
-int * trovaPassi(struct Nastro subnastro) {
+int* trovaPassi(struct Nastro subnastro) {
     int* passi = malloc(1024); //TODO Verificare grandezza in base ai test
-    passiTemporanei = 0;
+    int i = 0;
     for(int tr = 0; tr < trSize; tr++) {
         if(statoIn[tr] == statoOutTmp && letto[tr] == subnastro.nastro[subnastro.puntatore]) {
-            passi[passiTemporanei + 1] = tr;
-            passiTemporanei++;
-            passi[0] = passiTemporanei;
+            passi[i + 1] = tr;
+            i++;
+            passi[0] = i;
         }
     }
+
     return passi;
 }
 
@@ -120,31 +116,16 @@ void gestore() {
 
     long p = 1;
     while(1) {
-        printf("Nastro: %s\n", subnastro.nastro);
-        printf("Passo: %ld, Puntatore: %i, Carattere: %c, Len: %ld\n", p, subnastro.puntatore, subnastro.nastro[subnastro.puntatore], subnastro.len);
+        //printf("Nastro: %s\n", subnastro.nastro);
+        //printf("Passo: %ld, Puntatore: %i, Carattere: %c, Len: %ld\n", p, subnastro.puntatore, subnastro.nastro[subnastro.puntatore], subnastro.len);
         if(p >= max) {
-            sconosciuto++;
             printf("U\n");
             return;
         }
         int* passi = trovaPassi(subnastro);
-        /*
-        * Condizione da modificare e adattare al non determinismo in teoria fa stampare  0 ma sarebbe pù intelligente, per
-        * adattarlo al non determinismo, settare un flagghino a 0, facciamo una funzione di stampa che viene lanciata
-        * quando non ho più nessuna tr al passo successivo e devo quittare il nastro
-        */
-
-        printf("Passi temporanei %d\n", passiTemporanei);
-
-        if (passiTemporanei == 0) {
-            printf("%i", 0);
-            nonAccettato++;
-            return;
-        }
-
         if(passi[0] == 1) {
             int tr = passi[1];
-            printf("Transizione {Riga: %i, Scritto: %c Movimento: %c, StatoOut: %i}\n", tr + 2, scritto[tr], movimento[tr], statoOut[tr]);
+            //printf("Transizione {Riga: %i, Scritto: %c Movimento: %c, StatoOut: %i}\n", tr + 2, scritto[tr], movimento[tr], statoOut[tr]);
 
             if(isAccettazione(statoOut[tr])) {
                 printf("%i\n", 1);
@@ -205,7 +186,7 @@ void gestore() {
             struct Passo passo = {subnastro.len, subnastro.nastro, subnastro.puntatore, tr, statoOutTmp};
         }*/
         p++;
-        printf("________________________________________________________________________________________________________________________________\n");
+        //printf("________________________________________________________________________________________________________________________________\n");
     }
 }
 
@@ -276,17 +257,20 @@ int main() {
         char * tmp;
         while (scanf("%ms", &tmp)) {
             size_t len = strlen(tmp);
-            tmp = (char*) realloc(tmp, len + 1);
-            tmp[len] = '\0';
-            struct Nastro n = {len, tmp, 0};
-            nastro = n;
+            nastro.len = len;
+            nastro.nastro = tmp;
+            nastro.puntatore = 0;
+            printf("%s,\t%ld,\t%i\n",nastro.nastro, len, nastro.puntatore);
+            //printf("\n"); //TODO Remove this
+            //printf("main");
+            //gestore();
+            free(tmp);
             statoOutTmp = 0;
-            //printf("%s,\t%ld,\t%i\n",nastro.nastro, len, nastro.puntatore);
-            printf("\n"); //TODO Remove this
-            gestore();
-            printf("\n\n\n");
+            puntatoreGlobale = 0;
+            //printf("\n\n\n");
             //return 0;
         }
+        printf("out while\n");
     }
     return 0;
 }
