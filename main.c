@@ -2,239 +2,250 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INT_SIZE 4
+#define INT 4
 #define SIZE 10
+#define DEBUG 1
 
-//Transizioni
-int* statoIn;
-char* letto;
-char* scritto;
-char* movimento;
-int* statoOut;
+//Transitions
+int* in;
+char* read;
+char* write;
+char* move;
+int* out;
 int trSize = 0;
 
-//Parametri macchina
+//Params TM
 int* acc;
 int accSize = 0;
 long max;
 
 //Structs
-typedef struct Nastro {
-    size_t len;
-    char* nastro;
-    int puntatore;
-} Nastro;
+typedef struct Tape {
+    char* tape;
+    size_t size;
+    size_t pointer;
+} Tape;
 
-/*typedef struct Passo {
-    size_t len;
-    char* nastro;
-    int puntatore;
-    int tr;
-    int statoOutTmp;
-};*/
+//Global vars
+Tape tape;
+int outTmp = 0;
+size_t offset = 0;
 
-//Variabili globali
-Nastro nastro;
-int statoOutTmp = 0;
-size_t puntatoreGlobale = 0;
 
-char* ottieniFrammento(size_t puntatore) {
-    puntatore = puntatore - puntatoreGlobale;
-    char* tmp = malloc(SIZE + 1);
-    memcpy(tmp, nastro.nastro + puntatore, SIZE);
-    tmp[SIZE] = '\0';
-    if(puntatore + SIZE > nastro.len) {
-        for(size_t i = nastro.len; i < puntatore + SIZE; i++) {
-            tmp[i] = '_';
+void printTr() {
+    for(int i = 0; i < trSize; i++) {
+        printf("Transition {in=%i, read=%c, write=%c, move=%c, out=%i}\n", in[i], read[i], write[i], move[i], out[i]);
+    }
+}
+
+void printStatus() {
+    printf("--------\n");
+    printTr();
+    printf("TrSize=%i\n", trSize);
+    printf("\n\n");
+    printf("Acc [");
+    for(int i = 0; i < accSize; i++) {
+        printf("%i", acc[i]);
+        if(i != accSize - 1) printf(", ");
+    }
+    printf("]\n\n");
+    printf("Max=%ld\n", max);
+    printf("--------\n\n");
+}
+
+char* getChunk(size_t pointer) {
+    pointer = pointer - offset;
+    char* chunk = malloc(SIZE + 1);
+    memcpy(chunk, tape.tape + pointer, SIZE);
+    chunk[SIZE] = '\0';
+
+    if(pointer + SIZE > tape.size) {
+        for(size_t p = tape.size; p < pointer + SIZE; p++) {
+            chunk[p] = '_';
         }
     }
-    printf("ottieniFrammento: %s, puntatore: %ld\n", tmp, puntatore);
-    return tmp;
+    //printf("getChunk: chunk=%s\n", chunk);
+    return chunk;
 }
 
-char* patch(char* nastro, char* patch, size_t puntatore, size_t len) {
-    size_t j = 0;
-    for(size_t i = puntatore; i < len; i++) {
-        nastro[i] = patch[j];
-        j++;
+char* cleaner(char* tape, size_t start) {
+    for(size_t p = start; p < start + SIZE; p++) {
+        tape[p] = '_';
     }
-    return nastro;
+    return tape;
 }
 
-int isAccettazione(int statoOut) {
+int isInTheMiddle(size_t pointer) {
+    pointer = pointer - offset;
+    if(pointer <= SIZE || pointer > (tape.size / SIZE) * SIZE) return 0;
+    return 1;
+}
+
+int isAcc(int outTmp) {
     for(int i = 0; i < accSize; i++) {
-        if(statoOut == acc[i]) return 1;
+        if(outTmp == acc[i]) return 1;
     }
     return 0;
 }
 
-int isInMezzo(int puntatore) {
-    if(puntatore <= SIZE) return 0;
-    if(puntatore > (nastro.len / SIZE) * SIZE) return 0;
-    return 1;
-}
+int* findTransitions(char* tape, size_t pointer) {
+    int* transitions = malloc(1024); //TODO Verify if it is long enough
+    int size = 0;
 
-char* sbianchina(char* nastro, size_t min) {
-    for(size_t i = min; i < min + SIZE; i++) {
-        //printf("Sbianchina: %s\n", nastro);
-        nastro[i] = '_';
-    }
-    //printf("Sbianchina: %s\n", nastro);
-    return nastro;
-}
-
-void printTr() {
-    for(int i = 0; i < trSize; i++) {
-        printf("in: %d, rd: %c, wr: %c, mv: %c, out: %d\n", statoIn[i], letto[i], scritto[i], movimento[i], statoOut[i]);
-    }
-}
-
-int* trovaPassi(char* nastro, size_t puntatore) {
-    int* passi = malloc(1024); //TODO Verificare grandezza in base ai test
-    int i = 0;
     for(int tr = 0; tr < trSize; tr++) {
-        if(statoIn[tr] == statoOutTmp && letto[tr] == nastro[puntatore]) {
-            passi[i + 1] = tr;
-            i++;
-            passi[0] = i;
+        /*if(in[tr] == outTmp) {
+            printf("\nFindTransitions: %i == %i\n", in[tr], outTmp);
+            printf("\nFindTransitions: %c == %c\n", read[tr], tape[pointer]);
+            if(read[tr] == tape[pointer]) {
+                transitions[size + 1] = tr;
+                size++;
+            }
+        }*/
+        transitions[0] = size;
+        if(in[tr] == outTmp && read[tr] == tape[pointer]) {
+            transitions[size + 1] = tr;
+            size++;
         }
+        transitions[0] = size;
     }
 
-    return passi;
+    return transitions;
 }
 
-void gestore() {
-    Nastro subnastro;
-    char* tmp = ottieniFrammento(0);
-    size_t len = strlen(tmp);
-    subnastro.len = len;
-    subnastro.nastro = malloc(len);
-    strcpy(subnastro.nastro, tmp);
-    subnastro.puntatore = 0;
-    free(tmp);
+void handler() {
+    Tape tapeCpy;
+    char* chunk = getChunk(tape.pointer);
+    size_t len = strlen(chunk);
+    tapeCpy.size = len;
+    tapeCpy.tape = malloc(len);
+    strcpy(tapeCpy.tape, chunk);
+    tapeCpy.pointer = tape.pointer;
+    free(chunk);
 
-    long p = 1;
+    long step = 1;
     while(1) {
-        printf("Nastro: %s\n", subnastro.nastro);
-        printf("Passo: %ld, Puntatore: %i, Carattere: %c, Len: %ld\n", p, subnastro.puntatore, subnastro.nastro[subnastro.puntatore], subnastro.len);
-        if(p >= max) {
+        if(DEBUG) printf("Step: %ld\n", step);
+        if(step > max) { //TODO Verify if max step must be run or not
             printf("U\n");
             return;
         }
-        int* passi = trovaPassi(subnastro.nastro, subnastro.puntatore);
-        if(passi[0] == 0) {
+
+        int* transitions = findTransitions(tapeCpy.tape, tapeCpy.pointer);
+        if(transitions[0] == 0) {
             printf("%i\n", 0);
             return;
         }
-        if(passi[0] == 1) {
-            int tr = passi[1];
-            printf("Transizione {Riga: %i, Scritto: %c Movimento: %c, StatoOut: %i}\n", tr + 2, scritto[tr], movimento[tr], statoOut[tr]);
+        else if(transitions[0] == 1) {
+            int tr = transitions[1];
 
-            if(isAccettazione(statoOut[tr])) {
+            if(DEBUG) printf("Tape: %s\tPointer:%ld\n", tapeCpy.tape, tapeCpy.pointer);
+            if(DEBUG) printf("Transition {in=%i, read=%c, write=%c, move=%c, out=%i}\n", in[tr], read[tr], write[tr], move[tr], out[tr]);
+
+            if(isAcc(out[tr])) {
                 printf("%i\n", 1);
                 return;
             }
 
-            subnastro.nastro[subnastro.puntatore] = scritto[tr];
-            statoOutTmp = statoOut[tr];
+            tapeCpy.tape[tapeCpy.pointer] = write[tr];
+            outTmp = out[tr];
 
-            if(movimento[tr] == 'R') {
-                if(subnastro.puntatore == subnastro.len - 1) {
-                    char* nastroTmp = malloc(subnastro.len + SIZE);
-                    strcpy(nastroTmp, subnastro.nastro);
-                    if(!isInMezzo(subnastro.puntatore)) {
-                        nastroTmp = sbianchina(nastroTmp, subnastro.puntatore);
+            if(move[tr] == 'R') {
+                if(tapeCpy.pointer == tapeCpy.size - 1) {
+                    tapeCpy.pointer = tapeCpy.pointer + 1;
+                    char* newTape = malloc(tapeCpy.size + SIZE);
+                    strcpy(newTape, tapeCpy.tape);
+                    if (isInTheMiddle(tapeCpy.pointer)) {
+                        newTape = cleaner(newTape, tapeCpy.pointer);
                     } else {
-                        nastroTmp = patch(subnastro.nastro, ottieniFrammento(subnastro.puntatore + 1), subnastro.puntatore, subnastro.len + SIZE);
+                        //memcpy(newTape + tapeCpy.size, getChunk(tapeCpy.size), SIZE);
+                        strcat(newTape, getChunk(tapeCpy.pointer));
                     }
-                    printf("SubTmp: %s\n", nastroTmp);
-                    subnastro.len = subnastro.len + SIZE;
-                    subnastro.nastro = realloc(subnastro.nastro, subnastro.len);
-                    strcpy(subnastro.nastro, nastroTmp);
-                    subnastro.puntatore = subnastro.puntatore + 1;
+
+                    tapeCpy.size = tapeCpy.size + SIZE;
+                    tapeCpy.tape = realloc(tapeCpy.tape, tapeCpy.size);
+                    strcpy(tapeCpy.tape, newTape);
+                    free(newTape);
                 } else {
-                    subnastro.puntatore = subnastro.puntatore + 1;
+                    tapeCpy.pointer = tapeCpy.pointer + 1;
                 }
             }
-            else if(movimento[tr] == 'L') {
-                if(subnastro.puntatore == 0) {
-                    char* nastroTmp = malloc(subnastro.len + SIZE);
-                    memcpy(nastroTmp + SIZE, subnastro.nastro, subnastro.len);
-                    nastroTmp = sbianchina(nastroTmp, 0);
-                    subnastro.len = subnastro.len + SIZE;
-                    subnastro.nastro = realloc(subnastro.nastro, subnastro.len);
-                    strcpy(subnastro.nastro, nastroTmp);
-                    subnastro.puntatore = subnastro.puntatore + SIZE - 1;
-                    puntatoreGlobale += SIZE;
+            else if(move[tr] == 'L') {
+                if(tapeCpy.pointer == 0) {
+                    char* newTape = malloc(tapeCpy.size + SIZE);
+                    memcpy(newTape + SIZE, tapeCpy.tape, tapeCpy.size);
+                    newTape = cleaner(newTape, 0);
+                    tapeCpy.size = tapeCpy.size + SIZE;
+                    tapeCpy.tape = realloc(tapeCpy.tape, tapeCpy.size);
+                    strcpy(tapeCpy.tape, newTape);
+                    tapeCpy.pointer = tapeCpy.pointer + SIZE - 1;
+                    offset += SIZE;
+                    free(newTape);
                 } else {
-                    subnastro.puntatore = subnastro.puntatore - 1;
+                    tapeCpy.pointer = tapeCpy.pointer - 1;
                 }
             }
         }
-        /*for(int i = 1; i <= passi[0]; i++) {
-            int tr = passi[i];
-            if(isAccettazione(tr) == 1) {
-                printf("%i\n", 1);
-                return;
-            }
-            struct Passo passo = {subnastro.len, subnastro.nastro, subnastro.puntatore, tr, statoOutTmp};
-        }*/
-        p++;
-        //printf("________________________________________________________________________________________________________________________________\n");
+        if(DEBUG) printf("Tape: %s\tPointer:%ld\n", tapeCpy.tape, tapeCpy.pointer);
+
+        if(DEBUG) printf("________________________________________________________________________________________________________________________________\n");
+
+        step++;
     }
 }
 
 int main() {
-    statoIn = malloc(INT_SIZE);
-    letto = malloc(1);
-    scritto = malloc(1);
-    movimento = malloc(1);
-    statoOut = malloc(INT_SIZE);
-    acc = malloc(INT_SIZE);
+    in = malloc(INT);
+    read = malloc(1);
+    write = malloc(1);
+    move = malloc(1);
+    out = malloc(INT);
+    acc = malloc(INT);
 
     char* input;
-
     scanf("%ms", &input);
     if(strcmp(input, "tr\n")) {
         free(input);
 
-        int p1;
-        char p2;
-        char p3;
-        char p4;
-        int p5;
+        int inTmp;
+        char readTmp;
+        char writeTmp;
+        char moveTmp;
+        int outTmp;
         int i = 0;
 
-        while (scanf("%d %c %c %c %d", &p1, &p2, &p3, &p4, &p5)) {
-            trSize++;
-            statoIn[i] = p1;
-            letto[i] = p2;
-            scritto[i] = p3;
-            movimento[i] = p4;
-            statoOut[i] = p5;
+        while(scanf("%d %c %c %c %d", &inTmp, &readTmp, &writeTmp, &moveTmp, &outTmp)) {
+            in[i] = inTmp;
+            read[i] = readTmp;
+            write[i] = writeTmp;
+            move[i] = moveTmp;
+            out[i] = outTmp;
+
             i++;
 
-            statoIn = (int *) realloc(statoIn, (i + 2) * INT_SIZE);
-            letto = (char *) realloc(letto, (i + 2));
-            scritto = (char *) realloc(scritto, (i + 2));
-            movimento = (char *) realloc(movimento, (i + 2));
-            statoOut = (int *) realloc(statoOut, (i + 2) * INT_SIZE);
+            in = realloc(in, (i + 2) * INT);
+            read = realloc(read, (i + 2) * INT);
+            write = realloc(write, (i + 2) * INT);
+            move = realloc(move, (i + 2) * INT);
+            out = realloc(out, (i + 2) * INT);
         }
+
+        trSize = i;
     }
 
     scanf("%ms", &input);
     if(strcmp(input, "acc\n")) {
         free(input);
 
-        int p1;
+        int accTmp;
         int i = 0;
 
-        while (scanf("%d", &p1)) {
-            acc[i] = p1;
+        while(scanf("%d", &accTmp)) {
+            acc[i] = accTmp;
             i++;
-            accSize++;
-            acc = (int *) realloc(acc, (i + 2) * INT_SIZE);
+            acc = realloc(acc, (i + 2) * INT);
         }
+
+        accSize = i;
     }
 
     scanf("%ms", &input);
@@ -243,27 +254,32 @@ int main() {
         scanf("%ld", &max);
     }
 
+    printf("\n");
+    //printStatus();
+
     scanf("%ms", &input);
     if(strcmp(input, "run\n")) {
         free(input);
 
-        char * tmp;
-        while (scanf("%ms", &tmp)) {
-            size_t len = strlen(tmp);
-            nastro.len = len;
-            nastro.nastro = malloc(len);
-            strcpy(nastro.nastro, tmp);
-            free(tmp);
-            nastro.puntatore = 0;
-            printf("%s,\t%ld,\t%i\n",nastro.nastro, len, nastro.puntatore);
-            //printf("\n"); //TODO Remove this
-            gestore();
-            statoOutTmp = 0;
-            puntatoreGlobale = 0;
-            printf("\n\n\n");
+        while(scanf("%ms", &input)) {
+            size_t len = strlen(input);
+            tape.size = len;
+            tape.tape = malloc(len);
+            strcpy(tape.tape, input);
+            tape.pointer = 0;
+            free(input);
+
+            printf("Tape {tape=%s, size=%ld, pointer=%ld}\n", tape.tape, tape.size, tape.pointer);
+            printf("________________________________________________________________________________________________________________________________\n");
+            handler();
+            printf("\n________________________________________________________________________________________________________________________________\n\n");
+
+            outTmp = 0;
+            offset = 0;
+            free(tape.tape);
             return 0;
         }
-        printf("out while\n");
     }
+
     return 0;
 }
