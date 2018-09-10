@@ -3,8 +3,8 @@
 #include <string.h>
 
 #define INT 4
-#define SIZE 10
-#define DEBUG 1
+#define SIZE 10240
+#define DEBUG 0
 
 //Transitions
 int* in;
@@ -77,7 +77,9 @@ char* cleaner(char* tape, size_t start) {
 
 int isInTheMiddle(size_t pointer) {
     pointer = pointer - offset;
-    if(pointer <= SIZE || pointer > (tape.size / SIZE) * SIZE) return 0;
+    if(/*pointer < SIZE || */pointer >= (tape.size / SIZE) * SIZE) {
+        return 0;
+    }
     return 1;
 }
 
@@ -138,7 +140,7 @@ void handler() {
         else if(transitions[0] == 1) {
             int tr = transitions[1];
 
-            if(DEBUG) printf("Tape: %s\tPointer:%ld\n", tapeCpy.tape, tapeCpy.pointer);
+            if(DEBUG) printf("Tape: %s\tPointer:%ld\tSize:%ld\n", tapeCpy.tape, tapeCpy.pointer, tapeCpy.size);
             if(DEBUG) printf("Transition {in=%i, read=%c, write=%c, move=%c, out=%i}\n", in[tr], read[tr], write[tr], move[tr], out[tr]);
 
             if(isAcc(out[tr])) {
@@ -154,7 +156,7 @@ void handler() {
                     tapeCpy.pointer = tapeCpy.pointer + 1;
                     char* newTape = malloc(tapeCpy.size + SIZE);
                     strcpy(newTape, tapeCpy.tape);
-                    if (isInTheMiddle(tapeCpy.pointer)) {
+                    if (isInTheMiddle(tapeCpy.pointer) == 0) {
                         newTape = cleaner(newTape, tapeCpy.pointer);
                     } else {
                         //memcpy(newTape + tapeCpy.size, getChunk(tapeCpy.size), SIZE);
@@ -168,6 +170,7 @@ void handler() {
                 } else {
                     tapeCpy.pointer = tapeCpy.pointer + 1;
                 }
+
             }
             else if(move[tr] == 'L') {
                 if(tapeCpy.pointer == 0) {
@@ -185,7 +188,7 @@ void handler() {
                 }
             }
         }
-        if(DEBUG) printf("Tape: %s\tPointer:%ld\n", tapeCpy.tape, tapeCpy.pointer);
+        if(DEBUG) printf("Tape: %s\tPointer:%ld\tSize:%ld\n", tapeCpy.tape, tapeCpy.pointer, tapeCpy.size);
 
         if(DEBUG) printf("________________________________________________________________________________________________________________________________\n");
 
@@ -254,14 +257,22 @@ int main() {
         scanf("%ld", &max);
     }
 
-    printf("\n");
-    //printStatus();
+    //printf("\n");
+    printStatus();
 
     scanf("%ms", &input);
     if(strcmp(input, "run\n")) {
         free(input);
 
-        while(scanf("%ms", &input)) {
+        while(1) {
+            scanf("%ms", &input);
+            if(input == NULL) {
+                return 0;
+            }
+            printf("%s\n", input);
+        }
+
+        /*while(scanf("%ms", &input) == 1) {
             size_t len = strlen(input);
             tape.size = len;
             tape.tape = malloc(len);
@@ -270,15 +281,15 @@ int main() {
             free(input);
 
             printf("Tape {tape=%s, size=%ld, pointer=%ld}\n", tape.tape, tape.size, tape.pointer);
-            printf("________________________________________________________________________________________________________________________________\n");
+            //printf("________________________________________________________________________________________________________________________________\n");
             handler();
-            printf("\n________________________________________________________________________________________________________________________________\n\n");
+            //printf("\n________________________________________________________________________________________________________________________________\n\n");
 
             outTmp = 0;
             offset = 0;
             free(tape.tape);
-            return 0;
-        }
+            //return 0;
+        }*/
     }
 
     return 0;
