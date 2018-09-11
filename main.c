@@ -3,8 +3,8 @@
 #include <string.h>
 
 #define INT 4
-#define SIZE 128
-#define DEBUG 0
+#define SIZE 64
+#define DEBUG 1
 
 //Transitions
 int* in;
@@ -64,7 +64,6 @@ char* getChunk(size_t pointer) {
             chunk[p] = '_';
         }
     }
-    //printf("getChunk: chunk=%s\n", chunk);
     return chunk;
 }
 
@@ -75,13 +74,13 @@ char* cleaner(char* tape, size_t start) {
     return tape;
 }
 
-int isInTheMiddle(size_t pointer) {
+/*int isInTheMiddle(size_t pointer) {
     pointer = pointer - offset;
-    if(/*pointer < SIZE || */pointer >= (tape.size / SIZE) * SIZE) {
+    if(pointer >= (tape.size / SIZE) * SIZE) {
         return 0;
     }
     return 1;
-}
+}*/
 
 int isLast(size_t pointer) {
     size_t gp = pointer - offset;
@@ -186,7 +185,7 @@ void handler() {
                     memcpy(newTape + SIZE, tapeCpy.tape, tapeCpy.size);
                     newTape = cleaner(newTape, 0);
                     tapeCpy.size = tapeCpy.size + SIZE;
-                    tapeCpy.tape = realloc(tapeCpy.tape, tapeCpy.size);
+                    tapeCpy.tape = realloc(tapeCpy.tape, tapeCpy.size + 1);
                     strcpy(tapeCpy.tape, newTape);
                     tapeCpy.pointer = tapeCpy.pointer + SIZE - 1;
                     offset += SIZE;
