@@ -2,16 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INT 4
-#define SIZE 64
-#define DEBUG 1
+#define SIZE 10
 
 //Transitions
-int* in;
+int* input;
 char* read;
 char* write;
 char* move;
-int* out;
+int* output;
 int trSize = 0;
 
 //Params TM
@@ -20,47 +18,52 @@ int accSize = 0;
 long max;
 
 //Structs
-typedef struct Tape {
+typedef struct Machine {
+    int id;
     char* tape;
     size_t size;
     size_t pointer;
-} Tape;
+    int out;
+    size_t offset;
+    long step;
+} Machine;
 
 //Global vars
-Tape tape;
-int outTmp = 0;
-size_t offset = 0;
+char* tape;
+size_t tapeSize = 0;
+int lastId = 0;
+Machine* machines;
 
-
-void printTr() {
-    for(int i = 0; i < trSize; i++) {
-        printf("Transition {in=%i, read=%c, write=%c, move=%c, out=%i}\n", in[i], read[i], write[i], move[i], out[i]);
-    }
+void addMachine(Machine machine) {
+    machines = realloc(machines, sizeof(machines) + sizeof(machine));
+    machines[lastId] = machine;
 }
 
-void printStatus() {
-    printf("--------\n");
-    printTr();
-    printf("TrSize=%i\n", trSize);
-    printf("\n\n");
-    printf("Acc [");
-    for(int i = 0; i < accSize; i++) {
-        printf("%i", acc[i]);
-        if(i != accSize - 1) printf(", ");
-    }
-    printf("]\n\n");
-    printf("Max=%ld\n", max);
-    printf("--------\n\n");
+void removeLastMachine() {
+    size_t size = sizeof(machines[lastId]);
+    free(machines[lastId].tape);
+    machines = realloc(machines, sizeof(machines) - size);
+    lastId--;
 }
 
-char* getChunk(size_t pointer) {
+void printMachine(int id) {
+    printf("Machine: {id=%i, tape=%s, size=%ld, pointer=%ld, out=%i, offset=%ld, step=%ld}\n", machines[id].id, machines[id].tape, machines[id].size, machines[id].pointer, machines[id].out, machines[id].offset, machines[id].step);
+}
+
+void printMachines() {
+    printf("\n________\tInizio\t________\n");
+    for(int i = 0; i <= lastId; i++) printMachine(i);
+    printf("________\tFine\t________\n");
+}
+
+char* getChunk(size_t pointer, size_t offset) {
     pointer = pointer - offset;
     char* chunk = malloc(SIZE + 1);
-    memcpy(chunk, tape.tape + pointer, SIZE);
+    memcpy(chunk, tape + pointer, SIZE);
     chunk[SIZE] = '\0';
 
-    if(pointer + SIZE > tape.size) {
-        for(size_t p = tape.size; p < pointer + SIZE; p++) {
+    if(pointer + SIZE > tapeSize) {
+        for(size_t p = tapeSize; p < pointer + SIZE; p++) {
             chunk[p] = '_';
         }
     }
@@ -74,34 +77,26 @@ char* cleaner(char* tape, size_t start) {
     return tape;
 }
 
-/*int isInTheMiddle(size_t pointer) {
+int isLast(size_t pointer, size_t offset) {
     pointer = pointer - offset;
-    if(pointer >= (tape.size / SIZE) * SIZE) {
-        return 0;
-    }
-    return 1;
-}*/
-
-int isLast(size_t pointer) {
-    size_t gp = pointer - offset;
-    if(gp < tape.size - 1) return 0;
-    return 1;
+    if(pointer == tapeSize - 1) return 1;
+    return 0;
 }
 
-int isAcc(int outTmp) {
+int isAcc(int out) {
     for(int i = 0; i < accSize; i++) {
-        if(outTmp == acc[i]) return 1;
+        if(out == acc[i]) return 1;
     }
     return 0;
 }
 
-int* findTransitions(char* tape, size_t pointer) {
+int* findTransitions(int out, char c) {
     int* transitions = malloc(sizeof(int));
     int size = 0;
 
     for(int tr = 0; tr < trSize; tr++) {
-        transitions = realloc(transitions, size == 0 ? (size + 2) * sizeof(int) : (size + 1) * sizeof(int));
-        if(in[tr] == outTmp && read[tr] == tape[pointer]) {
+        if(input[tr] == out && read[tr] == c) {
+            if(size != 0) transitions = realloc(transitions, (size_t) ((size + 1) * sizeof(int)));
             transitions[size + 1] = tr;
             size++;
         }
@@ -111,110 +106,177 @@ int* findTransitions(char* tape, size_t pointer) {
     return transitions;
 }
 
-void handler() {
-    Tape tapeCpy;
-    /*char* chunk = getChunk(tape.pointer);
-    size_t len = strlen(chunk);
-    tapeCpy.size = len;
-    tapeCpy.tape = malloc(len);
-    strcpy(tapeCpy.tape, chunk);
-    tapeCpy.pointer = tape.pointer;
-    free(chunk);*/
-    tapeCpy.size = tape.size;
-    tapeCpy.tape = malloc(tapeCpy.size + 1);
-    strcpy(tapeCpy.tape, tape.tape);
-    tapeCpy.pointer = tape.pointer;
+Machine getMachine(int id) {
+    Machine machine;
+    machine.id = lastId;
+    machine.tape = malloc(machines[id].size);
+    strcpy(machine.tape, machines[id].tape);
+    machine.size = machines[id].size;
+    machine.pointer = machines[id].pointer;
+    machine.out = machines[id].out;
+    machine.offset = machines[id].offset;
+    machine.step = machines[id].step;
 
-    long step = 1;
-    while(1) {
-        if(step > max) { //TODO Verify if max step must be run or not
-            printf("U\n");
-            return;
-        }
+    return machine;
+}
 
-        if(DEBUG) printf("Step: %ld\n", step);
+void freeMachine(int id) {
+    Machine machine = machines[id];
+    free(machine.tape);
+}
 
-        int* transitions = findTransitions(tapeCpy.tape, tapeCpy.pointer);
-        if(transitions[0] == 0) {
-            printf("%i\n", 0);
-            return;
-        }
-        else if(transitions[0] == 1) {
-            int tr = transitions[1];
-
-            if(DEBUG) printf("Tape: %s\tPointer:%ld\tSize:%ld\n", tapeCpy.tape, tapeCpy.pointer, tapeCpy.size);
-            if(DEBUG) printf("Transition {in=%i, read=%c, write=%c, move=%c, out=%i}\n", in[tr], read[tr], write[tr], move[tr], out[tr]);
-
-            if(isAcc(out[tr])) {
-                printf("%i\n", 1);
-                return;
-            }
-
-            tapeCpy.tape[tapeCpy.pointer] = write[tr];
-            outTmp = out[tr];
-
-            if(move[tr] == 'R') {
-                if(tapeCpy.pointer == tapeCpy.size - 1) {
-                    tapeCpy.pointer = tapeCpy.pointer + 1;
-                    char* newTape = malloc(tapeCpy.size + SIZE);
-                    strcpy(newTape, tapeCpy.tape);
-                    if(isLast(tapeCpy.pointer)) {
-                        newTape = cleaner(newTape, tapeCpy.pointer);
-                    } else {
-                        strcat(newTape, getChunk(tapeCpy.pointer));
-                    }
-                    /*if (isInTheMiddle(tapeCpy.pointer) == 0) {
-                        newTape = cleaner(newTape, tapeCpy.pointer);
-                    } else {
-                        //memcpy(newTape + tapeCpy.size, getChunk(tapeCpy.size), SIZE);
-                        strcat(newTape, getChunk(tapeCpy.pointer));
-                    }*/
-
-                    tapeCpy.size = tapeCpy.size + SIZE;
-                    tapeCpy.tape = realloc(tapeCpy.tape, tapeCpy.size);
-                    strcpy(tapeCpy.tape, newTape);
-                    free(newTape);
-                } else {
-                    tapeCpy.pointer = tapeCpy.pointer + 1;
-                }
-
-            }
-            else if(move[tr] == 'L') {
-                if(tapeCpy.pointer == 0) {
-                    char* newTape = malloc(tapeCpy.size + SIZE);
-                    memcpy(newTape + SIZE, tapeCpy.tape, tapeCpy.size);
-                    newTape = cleaner(newTape, 0);
-                    tapeCpy.size = tapeCpy.size + SIZE;
-                    tapeCpy.tape = realloc(tapeCpy.tape, tapeCpy.size + 1);
-                    strcpy(tapeCpy.tape, newTape);
-                    tapeCpy.pointer = tapeCpy.pointer + SIZE - 1;
-                    offset += SIZE;
-                    free(newTape);
-                } else {
-                    tapeCpy.pointer = tapeCpy.pointer - 1;
-                }
-            }
-        }
-        if(DEBUG) printf("Tape: %s\tPointer:%ld\tSize:%ld\n", tapeCpy.tape, tapeCpy.pointer, tapeCpy.size);
-
-        if(DEBUG) printf("________________________________________________________________________________________________________________________________\n");
-
-        step++;
+void freeMachines() {
+    for(int i = 0; i <= lastId; i++) {
+        freeMachine(i);
+        free(machines);
     }
 }
 
+int runnable() {
+    while (lastId >= 0) {
+        //printMachines();
+
+        if(machines[lastId].step > max) return -1;
+
+        int* transitions = findTransitions(machines[lastId].out, machines[lastId].tape[machines[lastId].pointer]);
+        if(transitions[0] == 0) {
+            removeLastMachine();
+        } else {
+            for(int i = 1; i <= transitions[0]; i++) {
+                if(transitions[0] == 1) {
+                    machines[lastId].tape[machines[lastId].pointer] = write[transitions[i]];
+                    machines[lastId].out = output[transitions[i]];
+                    machines[lastId].step++;
+
+                    if(isAcc(machines[lastId].out)) return 1;
+
+                    if(move[transitions[i]] == 'R') {
+                        if(machines[lastId].pointer == machines[lastId].size - 1) {
+                            machines[lastId].size += SIZE;
+                            char* newTape = malloc(machines[lastId].size);
+                            strcpy(newTape, machines[lastId].tape);
+                            if(isLast(machines[lastId].pointer, machines[lastId].offset)) {
+                                newTape = cleaner(newTape, machines[lastId].pointer + 1);
+                            } else {
+                                strcat(newTape, getChunk(machines[lastId].pointer + 1, machines[lastId].offset));
+                            }
+                            machines = realloc(machines, sizeof(machines) + SIZE);
+                            machines[lastId].tape = realloc(machines[lastId].tape, machines[lastId].size);
+                            strcpy(machines[lastId].tape, newTape);
+                            free(newTape);
+                        }
+                        machines[lastId].pointer++;
+                    }
+                    else if(move[transitions[i]] == 'L') {
+                        if(machines[lastId].pointer == 0) {
+                            machines[lastId].size += SIZE;
+                            char* newTape = malloc(machines[lastId].size);
+                            memcpy(newTape + SIZE, machines[lastId].tape, machines[lastId].size - SIZE);
+                            newTape = cleaner(newTape, 0);
+                            machines = realloc(machines, sizeof(machines) + SIZE);
+                            machines[lastId].tape = realloc(machines[lastId].tape, machines[lastId].size);
+                            strcpy(machines[lastId].tape, newTape);
+                            free(newTape);
+                            machines[lastId].pointer = SIZE - 1;
+                            machines[lastId].offset += SIZE;
+                        } else {
+                            machines[lastId].pointer--;
+                        }
+                    }
+                    machines[lastId] = machines[lastId];
+
+                } else {
+                    Machine child = machines[machines[lastId].id];
+                    lastId++;
+                    child.id = lastId;
+                    child.tape[child.pointer] = write[transitions[i]];
+                    child.out = output[transitions[i]];
+                    child.step++;
+
+                    if(isAcc(child.out)) return 1;
+
+                    if(move[transitions[i]] == 'R') {
+                        if(child.pointer == child.size - 1) {
+                            child.size += SIZE;
+                            char* newTape = malloc(child.size);
+                            strcpy(newTape, child.tape);
+                            if(isLast(child.pointer, child.offset)) {
+                                newTape = cleaner(newTape, child.pointer + 1);
+                            } else {
+                                strcat(newTape, getChunk(child.pointer + 1, child.offset));
+                            }
+                            child.tape = realloc(child.tape, child.size);
+                            strcpy(child.tape, newTape);
+                            free(newTape);
+                        }
+                        child.pointer++;
+                    }
+                    else if(move[transitions[i]] == 'L') {
+                        if(child.pointer == 0) {
+                            child.size += SIZE;
+                            char* newTape = malloc(child.size);
+                            memcpy(newTape + SIZE, child.tape, child.size - SIZE);
+                            newTape = cleaner(newTape, 0);
+                            child.tape = realloc(child.tape, child.size);
+                            strcpy(child.tape, newTape);
+                            free(newTape);
+                            child.pointer = SIZE - 1;
+                            child.offset += SIZE;
+                        } else {
+                            child.pointer--;
+                        }
+                    }
+
+                    addMachine(child);
+                }
+            }
+        }
+
+    }
+    return 0;
+}
+
+void handler() {
+    Machine machine;
+    machine.id = lastId;
+    machine.tape = malloc(SIZE);
+    strcpy(machine.tape, getChunk(0, 0));
+    machine.size = tapeSize;
+    machine.pointer = 0;
+    machine.out = 0;
+    machine.offset = 0;
+    machine.step = 1;
+
+    machines = malloc(sizeof(Machine));
+    machines[lastId] = machine;
+
+    int response = runnable();
+
+    if(response == 0) {
+        printf("0\n");
+    }
+    else if(response == 1) {
+        printf("1\n");
+    }
+    else if(response == -1) {
+        printf("U\n");
+    }
+
+    freeMachines();
+}
+
 int main() {
-    in = malloc(INT);
+    input = malloc(sizeof(int));
     read = malloc(1);
     write = malloc(1);
     move = malloc(1);
-    out = malloc(INT);
-    acc = malloc(INT);
+    output = malloc(sizeof(int));
+    acc = malloc(sizeof(int));
 
-    char* input;
-    scanf("%ms", &input);
-    if(strcmp(input, "tr\n")) {
-        free(input);
+    char* inputTmp;
+    scanf("%ms", &inputTmp);
+    if(strcmp(inputTmp, "tr\n")) {
+        free(inputTmp);
 
         int inTmp;
         char readTmp;
@@ -224,27 +286,27 @@ int main() {
         int i = 0;
 
         while(scanf("%d %c %c %c %d", &inTmp, &readTmp, &writeTmp, &moveTmp, &outTmp)) {
-            in[i] = inTmp;
+            input[i] = inTmp;
             read[i] = readTmp;
             write[i] = writeTmp;
             move[i] = moveTmp;
-            out[i] = outTmp;
+            output[i] = outTmp;
 
             i++;
 
-            in = realloc(in, (i + 2) * INT);
-            read = realloc(read, (i + 2) * INT);
-            write = realloc(write, (i + 2) * INT);
-            move = realloc(move, (i + 2) * INT);
-            out = realloc(out, (i + 2) * INT);
+            input = realloc(input, (size_t) ((i + 2) * sizeof(int)));
+            read = realloc(read, (size_t) ((i + 2) * sizeof(int)));
+            write = realloc(write, (size_t) ((i + 2) * sizeof(int)));
+            move = realloc(move, (size_t) ((i + 2) * sizeof(int)));
+            output = realloc(output, (size_t) ((i + 2) * sizeof(int)));
         }
 
         trSize = i;
     }
 
-    scanf("%ms", &input);
-    if(strcmp(input, "acc\n")) {
-        free(input);
+    scanf("%ms", &inputTmp);
+    if(strcmp(inputTmp, "acc\n")) {
+        free(inputTmp);
 
         int accTmp;
         int i = 0;
@@ -252,40 +314,34 @@ int main() {
         while(scanf("%d", &accTmp)) {
             acc[i] = accTmp;
             i++;
-            acc = realloc(acc, (i + 2) * INT);
+            acc = realloc(acc, (size_t) ((i + 2) * sizeof(int)));
         }
 
         accSize = i;
     }
 
-    scanf("%ms", &input);
-    if(strcmp(input, "max\n")) {
-        free(input);
+    scanf("%ms", &inputTmp);
+    if(strcmp(inputTmp, "max\n")) {
+        free(inputTmp);
         scanf("%ld", &max);
     }
 
-    //printf("\n");
-    //printStatus();
+    scanf("%ms", &inputTmp);
+    if(strcmp(inputTmp, "run\n")) {
+        free(inputTmp);
+        while(scanf("%ms", &inputTmp) == 1) {
+            tapeSize = strlen(inputTmp);
+            tape = realloc(NULL, tapeSize);
+            strcpy(tape, inputTmp);
+            free(inputTmp);
 
-    scanf("%ms", &input);
-    if(strcmp(input, "run\n")) {
-        free(input);
-        while(scanf("%ms", &input) == 1) {
-            size_t len = strlen(input);
-            tape.size = len;
-            tape.tape = malloc(len);
-            strcpy(tape.tape, input);
-            tape.pointer = 0;
-            free(input);
-
-            //printf("Tape {tape=%s, size=%ld, pointer=%ld}\n", tape.tape, tape.size, tape.pointer);
+            //printf("\n");
+            //printf("Tape {tape=%s, size=%ld}\n", tape, tapeSize);
             //printf("________________________________________________________________________________________________________________________________\n");
             handler();
             //printf("\n________________________________________________________________________________________________________________________________\n\n");
 
-            outTmp = 0;
-            offset = 0;
-            free(tape.tape);
+            free(tape);
             //return 0;
         }
     }
